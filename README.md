@@ -231,6 +231,67 @@ http://localhost:3000/docs
 | `GET` | `/themes/:id/versions` | List version history for a theme |
 | `GET` | `/themes/:id/versions/latest` | Get latest version metadata and changelog |
 
+#### Categories & Tags
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/categories` | Create a theme category (e.g., Dark, Nature, Holiday, Retro) |
+| `GET` | `/categories` | List all categories with theme counts |
+| `GET` | `/categories/:id` | Get category details and its themes |
+| `PATCH` | `/categories/:id` | Update category name, description, or sort order (admin) |
+| `DELETE` | `/categories/:id` | Archive a category (admin) |
+| `POST` | `/tags` | Create a tag for cross-category labeling |
+| `GET` | `/tags` | List all tags with usage counts |
+| `POST` | `/themes/:id/tags` | Assign tags to a theme |
+| `DELETE` | `/themes/:id/tags/:tagId` | Remove a tag from a theme |
+
+#### Ratings & Reviews
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/themes/:id/reviews` | Submit a rating and review for a purchased theme |
+| `GET` | `/themes/:id/reviews` | List reviews for a theme (paginated, sortable by date/rating) |
+| `GET` | `/themes/:id/reviews/summary` | Get aggregated rating (average, distribution, total count) |
+| `PATCH` | `/reviews/:id` | Update own review |
+| `DELETE` | `/reviews/:id` | Delete own review |
+| `POST` | `/reviews/:id/report` | Flag a review for moderation |
+
+#### Game Compatibility
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/compatibility/:themeId` | List games compatible with a theme |
+| `POST` | `/compatibility` | Register a theme-game compatibility mapping (admin) |
+| `DELETE` | `/compatibility/:id` | Remove a compatibility mapping (admin) |
+| `GET` | `/compatibility/games/:gameId` | List all themes compatible with a specific game |
+
+#### Wishlists
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/wishlists` | Add a theme to user's wishlist |
+| `GET` | `/wishlists` | List user's wishlisted themes |
+| `DELETE` | `/wishlists/:themeId` | Remove a theme from wishlist |
+| `GET` | `/wishlists/notifications` | Check if any wishlisted themes are on sale or newly released |
+
+#### Preview Assets
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/themes/:id/previews` | Upload preview screenshots for a theme (admin) |
+| `GET` | `/themes/:id/previews` | List preview images for a theme (thumbnails + full-size URLs) |
+| `DELETE` | `/previews/:id` | Remove a preview image (admin) |
+| `PATCH` | `/previews/:id` | Update preview sort order or alt text (admin) |
+
+#### Analytics
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/analytics/popular` | Most downloaded themes (filterable by game/time range) |
+| `GET` | `/analytics/trending` | Trending themes (based on recent download velocity) |
+| `GET` | `/analytics/top-rated` | Highest-rated themes with minimum review threshold |
+| `GET` | `/analytics/revenue` | Theme sales revenue report (filterable by date range/category) |
+
 ## Architecture
 
 This project enforces seven complementary design principles:
