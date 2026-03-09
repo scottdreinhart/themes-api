@@ -172,6 +172,65 @@ http://localhost:3000/docs
 | `GET` | `/ready` | Readiness check — returns `{ ready: true }` when all dependencies are available |
 | `GET` | `/docs` | Swagger UI — interactive API documentation |
 
+### Proposed Endpoints
+
+#### Theme Catalog
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/themes` | List all available themes (paginated, filterable by game/category/price) |
+| `GET` | `/themes/:id` | Get theme details (name, description, preview images, price, compatibility) |
+| `GET` | `/themes/featured` | Get featured/promoted themes for storefront display |
+| `GET` | `/themes/search` | Full-text search across theme names, descriptions, and tags |
+| `POST` | `/themes` | Create a new theme entry (admin) |
+| `PATCH` | `/themes/:id` | Update theme metadata (admin) |
+| `DELETE` | `/themes/:id` | Archive a theme from the catalog (admin) |
+
+#### Theme Packs (Bundles)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/packs` | Create a theme bundle (groups multiple themes at a discounted price) |
+| `GET` | `/packs` | List all theme packs |
+| `GET` | `/packs/:id` | Get pack details and included themes |
+| `PATCH` | `/packs/:id` | Update pack contents or pricing (admin) |
+| `DELETE` | `/packs/:id` | Archive a theme pack (admin) |
+
+#### Purchases & Entitlements
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/purchases` | Purchase a theme or pack (validates entitlement via Billing API) |
+| `GET` | `/purchases` | List user’s purchased themes (paginated) |
+| `GET` | `/purchases/:id` | Get purchase receipt details |
+| `GET` | `/entitlements` | List all themes a user is entitled to (purchased + free + bundled) |
+| `GET` | `/entitlements/check` | Check if user owns a specific theme (`?userId=&themeId=`) |
+
+#### Asset Downloads
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/downloads/:themeId/token` | Generate a time-limited signed download token for theme assets |
+| `GET` | `/downloads/:themeId` | Download theme asset bundle (requires valid token) |
+| `GET` | `/downloads/:themeId/manifest` | Get asset manifest (file list, sizes, checksums for incremental sync) |
+
+#### Install State
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/installs` | List user’s installed themes per game |
+| `POST` | `/installs` | Record a theme installation on a specific game client |
+| `DELETE` | `/installs/:id` | Record a theme uninstall |
+| `GET` | `/installs/sync` | Get install diff for a game client (what to add/remove since last sync) |
+
+#### Theme Versions
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/themes/:id/versions` | Publish a new version of a theme (admin) |
+| `GET` | `/themes/:id/versions` | List version history for a theme |
+| `GET` | `/themes/:id/versions/latest` | Get latest version metadata and changelog |
+
 ## Architecture
 
 This project enforces seven complementary design principles:
@@ -238,10 +297,16 @@ This project enforces seven complementary design principles:
 
 ## Future Improvements
 
-- [ ] **WebSocket support** — real-time event streaming for live updates
-- [ ] **Message queue integration** — async job processing with BullMQ or similar
-- [ ] **Caching layer** — Redis-backed response caching for high-traffic endpoints
-- [ ] **Multi-tenant support** — serve all portfolio games from a single API instance
+- [ ] **CDN integration** — serve theme assets from a global CDN (CloudFront / Cloudflare R2) with signed URLs for access control
+- [ ] **Image optimization pipeline** — auto-generate preview thumbnails, WebP variants, and responsive sizes on theme upload
+- [ ] **Theme preview sandbox** — API endpoint that renders a live preview of a theme applied to a sample game board
+- [ ] **Incremental asset sync** — delta downloads so game clients only fetch changed files when a theme updates
+- [ ] **User-generated themes** — allow players to upload custom themes with moderation queue and approval workflow
+- [ ] **Theme ratings & reviews** — endpoints for users to rate/review themes with aggregated scores on catalog listings
+- [ ] **Seasonal collections** — auto-curate time-limited theme bundles (holiday, event-based) with scheduled publish/unpublish
+- [ ] **Cross-game compatibility matrix** — track which themes work with which games and auto-filter the catalog per game
+- [ ] **Analytics endpoints** — report most-downloaded, highest-rated, and trending themes for storefront personalization
+- [ ] **Webhook notifications** — notify game clients when a purchased theme receives an update
 
 ## Portfolio Services
 
