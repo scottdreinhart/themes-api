@@ -24,7 +24,7 @@ See [LICENSE](LICENSE) file for complete terms and conditions.
 > [!CAUTION]
 > **LICENSE TRANSITION PLANNED** — This project is currently proprietary. The license will change to open source once the project has reached a suitable state to allow for it.
 
-[Project Structure](#project-structure) · [Getting Started](#getting-started) · [Tech Stack](#tech-stack) · [API Reference](#api-reference) · [Architecture](#architecture) · [Contributing](#contributing) · [Portfolio Services](#portfolio-services) · [Portfolio Games](#portfolio-games)
+[Project Structure](#project-structure) · [Getting Started](#getting-started) · [Tech Stack](#tech-stack) · [API Reference](#api-reference) · [Architecture](#architecture) · [Environment Variables](#environment-variables) · [Authentication](#authentication) · [Error Handling](#error-handling) · [Rate Limiting](#rate-limiting) · [Data Models](#data-models) · [Deployment](#deployment) · [Supported Clients](#supported-clients) · [Versioning](#versioning) · [Remaining Work](#remaining-work) · [Future Improvements](#future-improvements) · [Contributing](#contributing) · [Portfolio Services](#portfolio-services) · [Portfolio Games](#portfolio-games)
 
 ## Project Structure
 
@@ -369,6 +369,312 @@ This project enforces seven complementary design principles:
    - All inputs validated with Zod schemas in the domain layer
    - Fastify route schemas auto-generate OpenAPI docs via `@fastify/swagger`
    - **Benefit**: Single source of truth for validation, serialization, and documentation
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+| Variable | Description | Type | Default | Required |
+| -------- | ----------- | ---- | ------- | -------- |
+| `PORT` | HTTP server port | `number` | `3000` | No |
+| `HOST` | Bind address | `string` | `0.0.0.0` | No |
+| `NODE_ENV` | Runtime environment (`development`, `staging`, `production`) | `string` | `development` | No |
+| `LOG_LEVEL` | Pino log level (`fatal`, `error`, `warn`, `info`, `debug`, `trace`) | `string` | `info` | No |
+| `DATABASE_URL` | PostgreSQL connection string | `string` | — | **Yes** (production) |
+| `API_KEY` | Service-to-service API key for internal callers | `string` | — | **Yes** (production) |
+| `JWT_SECRET` | Secret used to sign and verify JWT access tokens | `string` | — | **Yes** (production) |
+| `CDN_BASE_URL` | Base URL for theme asset CDN (CloudFront / Cloudflare R2) | `string` | — | No |
+| `CDN_SIGNING_KEY` | Private key for generating signed CDN download URLs | `string` | — | No |
+| `STORAGE_BUCKET` | S3-compatible bucket name for theme asset uploads | `string` | — | **Yes** (production) |
+| `STORAGE_REGION` | Cloud storage region | `string` | `us-east-1` | No |
+| `STORAGE_ACCESS_KEY` | Cloud storage access key ID | `string` | — | **Yes** (production) |
+| `STORAGE_SECRET_KEY` | Cloud storage secret access key | `string` | — | **Yes** (production) |
+| `BILLING_API_URL` | Internal Billing API base URL for purchase verification | `string` | `http://localhost:3001` | No |
+| `BILLING_API_KEY` | API key for authenticating with the Billing API | `string` | — | **Yes** (production) |
+| `CORS_ORIGIN` | Allowed CORS origin(s), comma-separated | `string` | `*` | No |
+| `RATE_LIMIT_MAX` | Max requests per rate-limit window | `number` | `100` | No |
+| `RATE_LIMIT_WINDOW_MS` | Rate-limit window duration in milliseconds | `number` | `60000` | No |
+
+## Authentication
+
+All non-public endpoints require authentication. The API supports two authentication methods:
+
+### JWT Bearer Tokens (Game Clients & Admin Apps)
+
+Game clients and admin apps authenticate by sending a JWT in the `Authorization` header:
+
+```
+Authorization: Bearer <token>
+```
+
+- Tokens are issued by the auth service upon successful login
+- Tokens contain the user's `sub` (user ID) and `roles` array
+- Tokens expire after a configurable TTL (default: 1 hour)
+- Refresh tokens are used to obtain new access tokens without re-authentication
+
+### API Keys (Service-to-Service)
+
+Internal services authenticate with a static API key in the `X-API-Key` header:
+
+```
+X-API-Key: <key>
+```
+
+- Used by game clients, admin apps, and other portfolio APIs for server-to-server calls
+- Keys are configured via the `API_KEY` environment variable
+- API key requests bypass user-scoped authorization checks
+
+### Public Endpoints
+
+The following endpoints do not require authentication:
+
+| Endpoint | Purpose |
+| -------- | ------- |
+| `GET /health` | Health check |
+| `GET /ready` | Readiness probe |
+| `GET /docs` | Swagger UI |
+| `GET /docs/json` | OpenAPI spec |
+| `GET /catalog` | Public theme catalog browsing |
+
+## Error Handling
+
+All error responses follow a consistent JSON structure:
+
+```json
+{
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "Theme pack 'enchanted-forest-v2' does not exist",
+  "code": "THEME_NOT_FOUND"
+}
+```
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `statusCode` | `number` | HTTP status code |
+| `error` | `string` | HTTP status text |
+| `message` | `string` | Human-readable error description |
+| `code` | `string?` | Machine-readable domain error code (optional) |
+
+### HTTP Status Codes
+
+| Status | Meaning | Example |
+| ------ | ------- | ------- |
+| `400` | Bad Request | Malformed JSON body or invalid file upload |
+| `401` | Unauthorized | Missing or expired JWT / invalid API key |
+| `403` | Forbidden | Valid auth but insufficient role (e.g., non-admin uploading themes) |
+| `404` | Not Found | Theme pack or catalog item not found |
+| `409` | Conflict | Theme with the same slug already exists |
+| `413` | Payload Too Large | Theme asset upload exceeds size limit |
+| `415` | Unsupported Media Type | Uploaded file is not a supported asset format |
+| `422` | Unprocessable Entity | Business rule violation (e.g., incompatible game version) |
+| `429` | Too Many Requests | Rate limit exceeded |
+| `500` | Internal Server Error | Unexpected failure |
+
+### Domain Error Codes
+
+| Code | Description |
+| ---- | ----------- |
+| `THEME_NOT_FOUND` | No theme pack exists with the given ID or slug |
+| `THEME_ALREADY_EXISTS` | A theme with this slug is already in the catalog |
+| `THEME_NOT_PUBLISHED` | Theme exists but is not in a published state |
+| `ASSET_UPLOAD_FAILED` | Asset could not be stored (storage service error) |
+| `ASSET_FORMAT_UNSUPPORTED` | Uploaded file type is not accepted |
+| `ASSET_TOO_LARGE` | File exceeds the maximum allowed size |
+| `DOWNLOAD_TOKEN_EXPIRED` | Signed download URL has expired |
+| `DOWNLOAD_TOKEN_INVALID` | Download token signature could not be verified |
+| `PURCHASE_NOT_VERIFIED` | Billing API could not confirm the user owns this theme |
+| `GAME_INCOMPATIBLE` | Theme is not compatible with the requesting game version |
+| `REVIEW_ALREADY_SUBMITTED` | User has already reviewed this theme |
+| `CATEGORY_NOT_FOUND` | Category or tag does not exist |
+| `WISHLIST_DUPLICATE` | Theme is already on the user's wishlist |
+
+## Rate Limiting
+
+Rate limiting is enforced via `@fastify/rate-limit` to protect against abuse:
+
+| Scope | Limit | Window | Notes |
+| ----- | ----- | ------ | ----- |
+| **Global default** | 100 requests | 60 seconds | Per IP address |
+| **Catalog browsing** | 200 requests | 60 seconds | Higher limit for public browsing |
+| **Asset downloads** | 30 requests | 60 seconds | Prevents download abuse |
+| **Asset uploads** | 10 requests | 60 seconds | Admin-only, upload-heavy |
+| **Search endpoints** | 60 requests | 60 seconds | Prevents search abuse |
+| **Health / readiness** | Unlimited | — | Excluded from rate limiting |
+
+Rate-limited responses include standard headers:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 47
+X-RateLimit-Reset: 1719000060
+Retry-After: 12
+```
+
+When the limit is exceeded, the API returns `429 Too Many Requests` with the error body above.
+
+## Data Models
+
+Planned domain entities for the theme system. These will be implemented as Zod schemas in `src/domain/types.ts`:
+
+### ThemePack
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `id` | `string (uuid)` | Unique theme pack identifier |
+| `slug` | `string` | URL-friendly unique slug |
+| `name` | `string` | Display name |
+| `description` | `string` | Detailed description |
+| `version` | `string (semver)` | Current version |
+| `authorId` | `string (uuid)` | Creator's user ID |
+| `status` | `'draft' \| 'review' \| 'published' \| 'archived'` | Publication state |
+| `previewImageUrl` | `string` | URL to the preview thumbnail |
+| `price` | `number` | Price in cents (`0` = free) |
+| `currency` | `string` | ISO 4217 currency code |
+| `tags` | `string[]` | Associated tag slugs |
+| `categoryId` | `string (uuid)` | Primary category |
+| `compatibleGames` | `string[]` | List of game identifiers this theme supports |
+| `downloadCount` | `number` | Total downloads |
+| `averageRating` | `number` | Aggregated star rating (1–5) |
+| `createdAt` | `string (ISO 8601)` | Creation timestamp |
+| `updatedAt` | `string (ISO 8601)` | Last update timestamp |
+
+### AssetManifest
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `id` | `string (uuid)` | Manifest identifier |
+| `themeId` | `string (uuid)` | Parent theme pack |
+| `version` | `string (semver)` | Manifest version |
+| `files` | `AssetFile[]` | Array of asset file entries |
+| `totalSizeBytes` | `number` | Total download size |
+| `checksum` | `string` | SHA-256 hash of the bundle |
+
+### AssetFile
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `path` | `string` | Relative file path within the theme |
+| `mimeType` | `string` | MIME type (e.g., `image/webp`, `audio/ogg`) |
+| `sizeBytes` | `number` | File size |
+| `checksum` | `string` | SHA-256 hash for integrity verification |
+
+### DownloadToken
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `token` | `string` | Signed download token |
+| `themeId` | `string (uuid)` | Theme being downloaded |
+| `userId` | `string (uuid)` | Authorized user |
+| `expiresAt` | `string (ISO 8601)` | Token expiry (short-lived, ~15 minutes) |
+| `downloadUrl` | `string` | Signed CDN URL |
+
+### PurchaseRecord
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `id` | `string (uuid)` | Purchase identifier |
+| `userId` | `string (uuid)` | Buyer's user ID |
+| `themeId` | `string (uuid)` | Purchased theme |
+| `pricePaid` | `number` | Amount paid in cents |
+| `currency` | `string` | ISO 4217 currency code |
+| `source` | `'billing_api' \| 'promo' \| 'bundle'` | How the purchase was made |
+| `purchasedAt` | `string (ISO 8601)` | Purchase timestamp |
+
+### Category
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `id` | `string (uuid)` | Category identifier |
+| `slug` | `string` | URL-friendly name |
+| `name` | `string` | Display name |
+| `description` | `string` | Category description |
+| `parentId` | `string (uuid)?` | Parent category for nesting |
+| `sortOrder` | `number` | Display order |
+
+### Review
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `id` | `string (uuid)` | Review identifier |
+| `userId` | `string (uuid)` | Reviewer's user ID |
+| `themeId` | `string (uuid)` | Reviewed theme |
+| `rating` | `number` | Star rating (1–5) |
+| `title` | `string?` | Optional review title |
+| `body` | `string?` | Optional review text |
+| `createdAt` | `string (ISO 8601)` | Submission timestamp |
+| `updatedAt` | `string (ISO 8601)` | Last edit timestamp |
+
+## Deployment
+
+### Docker (Recommended)
+
+```bash
+# Build the production image
+docker build -t themes-api .
+
+# Run with environment variables
+docker run -d \
+  --name themes-api \
+  -p 3000:3000 \
+  -e NODE_ENV=production \
+  -e DATABASE_URL=postgresql://user:pass@db:5432/themes \
+  -e JWT_SECRET=your-jwt-secret \
+  -e STORAGE_BUCKET=themes-assets \
+  -e STORAGE_ACCESS_KEY=AKIA... \
+  -e STORAGE_SECRET_KEY=... \
+  -e BILLING_API_URL=http://billing-api:3000 \
+  -e BILLING_API_KEY=internal-key \
+  themes-api
+```
+
+### Health Checks
+
+Configure your orchestrator (Docker Compose, Kubernetes, ECS) to use the built-in probes:
+
+| Probe | Endpoint | Interval | Timeout | Failure Threshold |
+| ----- | -------- | -------- | ------- | ----------------- |
+| Liveness | `GET /health` | 30s | 5s | 3 |
+| Readiness | `GET /ready` | 10s | 5s | 3 |
+
+### Production Checklist
+
+- [ ] Set `NODE_ENV=production`
+- [ ] Provide all **required** environment variables (see [Environment Variables](#environment-variables))
+- [ ] Configure database connection pooling (recommended: 10–20 connections)
+- [ ] Enable TLS termination at the load balancer / reverse proxy
+- [ ] Set up database migrations before first deploy
+- [ ] Configure cloud storage bucket with appropriate CORS and lifecycle policies
+- [ ] Set up CDN for theme asset delivery
+- [ ] Configure log aggregation (Pino outputs structured JSON)
+- [ ] Set up monitoring alerts on `/health` and `/ready`
+- [ ] Enable CORS for specific origins (do not use `*` in production)
+- [ ] Set asset upload size limits at the reverse proxy level
+
+## Supported Clients
+
+This API is consumed by the following applications:
+
+| Client | Type | Description |
+| ------ | ---- | ----------- |
+| **[🎨 Theme Store](https://github.com/scottdreinhart/theme-store)** | Admin App | Theme catalog management, uploads, reviews moderation |
+| **All portfolio games** | Game Clients | Browse catalog, download purchased themes, check compatibility |
+| **[💳 Billing API](https://github.com/scottdreinhart/billing-api)** | API (internal) | Purchase fulfillment callbacks when a theme is bought |
+
+## Versioning
+
+The API uses **URL-prefix versioning**:
+
+```
+https://api.example.com/v1/catalog
+https://api.example.com/v1/themes
+```
+
+- All current endpoints are under `/v1/`
+- Breaking changes will be introduced under `/v2/` with a deprecation notice on `/v1/`
+- Non-breaking additions (new fields, new endpoints) are added to the current version
+- Deprecated versions will be supported for a minimum of **6 months** after the successor is released
+- The OpenAPI spec at `/docs/json` includes the version in its `info.version` field
 
 ## Remaining Work
 
