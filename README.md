@@ -292,6 +292,43 @@ http://localhost:3000/docs
 | `GET` | `/analytics/top-rated` | Highest-rated themes with minimum review threshold |
 | `GET` | `/analytics/revenue` | Theme sales revenue report (filterable by date range/category) |
 
+### Client UI Pairings
+
+Endpoints that pair directly with a visible UI element in game clients or the Theme Store admin app:
+
+| UI Element | Icon / Control | Endpoint | Surface |
+|---|---|---|---|
+| Theme card grid | Thumbnail image cards in a responsive grid | `GET /themes` | Game client — theme store browse |
+| Theme detail view | Full-screen preview with metadata panel | `GET /themes/:id` | Game client — theme detail |
+| "Featured" hero carousel | Image carousel / banner slider | `GET /themes/featured` | Game client — theme store landing |
+| Search bar | 🔍 magnifying glass icon + text input | `GET /themes/search` | Game client — theme store header |
+| Category filter bar | Pill / chip buttons (Dark, Nature, Holiday, etc.) | `GET /categories` | Game client — theme store sidebar or top bar |
+| Tag badges | Colored tag chips on theme cards | `GET /tags` | Game client — theme card overlay |
+| "Buy" button | 🛒 shopping cart icon CTA on theme card | `POST /purchases` | Game client — theme card / detail |
+| Price badge | 💲 price tag label on theme card | `GET /themes/:id` | Game client — theme card corner |
+| "Download" button | ⬇ download arrow (appears after purchase) | `GET /downloads/:themeId` | Game client — owned theme card |
+| Download progress bar | Progress indicator during download | `GET /downloads/:themeId/manifest` | Game client — download overlay |
+| "Apply Theme" button | 🎨 paintbrush icon | `POST /installs` | Game client — owned theme card |
+| "Remove Theme" button | 🗑 trash icon on installed theme row | `DELETE /installs/:id` | Game client — installed themes list |
+| Active theme indicator | ✅ checkmark badge on current theme | `GET /installs` | Game client — theme list |
+| Wishlist heart toggle | ❤ heart icon (outline ↔ filled) | `POST /wishlists` · `DELETE /wishlists/:themeId` | Game client — theme card corner |
+| Wishlist sale notification | 🔔 bell badge on wishlisted theme | `GET /wishlists/notifications` | Game client — theme store notification dot |
+| Star rating widget | ⭐ 1–5 clickable stars | `POST /themes/:id/reviews` | Game client — theme detail (post-purchase) |
+| Rating summary | ⭐ average + histogram bars | `GET /themes/:id/reviews/summary` | Game client — theme detail header |
+| Review text area | Text input + "Submit" button | `POST /themes/:id/reviews` | Game client — review form |
+| Review edit button | ✏ pencil icon on own review | `PATCH /reviews/:id` | Game client — own review row |
+| Review delete button | 🗑 trash icon on own review | `DELETE /reviews/:id` | Game client — own review row |
+| Report review button | 🚩 flag icon on review row | `POST /reviews/:id/report` | Game client — review row |
+| Compatibility badges | ✅ / ❌ per-game icons on theme card | `GET /compatibility/:themeId` | Game client — theme detail |
+| Preview image carousel | Image lightbox / swipe gallery | `GET /themes/:id/previews` | Game client — theme detail |
+| Version selector dropdown | Dropdown showing version history | `GET /themes/:id/versions` | Admin app — theme detail |
+| "Update Available" badge | 🔄 update arrow badge on theme card | `GET /themes/:id/versions/latest` | Game client — installed themes |
+| Bundle card | Multi-theme pack card with discount badge | `GET /packs` | Game client — theme store bundles section |
+| "Trending" badge | 🔥 fire icon on theme card | `GET /analytics/trending` | Game client — theme store |
+| "Popular" badge | 📈 chart icon on theme card | `GET /analytics/popular` | Game client — theme store |
+| Top-rated filter | ⭐ "Top Rated" sort button | `GET /analytics/top-rated` | Game client — theme store toolbar |
+| Revenue chart | 📊 bar/line chart widget | `GET /analytics/revenue` | Admin app — analytics dashboard |
+
 ## Architecture
 
 This project enforces seven complementary design principles:
